@@ -107,3 +107,6 @@ func (c *Client) UploadNARWithListing(ctx context.Context, narKey string, narObj
 func (c *Client) SetRegistrationTimeout(d time.Duration) {
 	c.registrationTimeout = d
 }
+
+// GenerateNarinfoContent re-exports generateNarinfoContent for the external test package.
+var GenerateNarinfoContent = generateNarinfoContent //nolint:gochecknoglobals // test-only re-export
