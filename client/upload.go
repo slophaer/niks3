@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -552,8 +553,16 @@ func (c *Client) uploadNarinfosInParallel(ctx context.Context, narinfos []narinf
 // It returns the full list of store paths that were part of the uploaded
 // closures (including transitive dependencies), which callers can use to
 // prune queues of dependency paths that no longer need separate uploads.
-func (c *Client) PushPaths(ctx context.Context, paths []string) ([]string, error) {
+func (c *Client) PushPaths(ctx context.Context, args []string) ([]string, error) {
 	startTime := time.Now()
+
+	paths, derivationOutputs := splitDerivationOutputs(args)
+	paths = withFixedOutputs(paths, derivationOutputs)
+
+	named, namedOutPaths, err := c.namedRealisations(ctx, derivationOutputs)
+	if err != nil {
+		return nil, fmt.Errorf("querying realisations: %w", err)
+	}
 
 	// Resolve symlinks to actual store paths
 	resolvedPaths, err := resolveSymlinks(paths, c.storeDir)
@@ -578,13 +587,26 @@ func (c *Client) PushPaths(ctx context.Context, paths []string) ([]string, error
 			}
 		}
 
-		if len(missing) == 0 {
+		if len(missing) == 0 && len(namedOutPaths) == 0 {
 			slog.Info(fmt.Sprintf("All %d paths already cached", len(resolvedPaths)))
 
 			return resolvedPaths, nil
 		}
 
 		resolvedPaths = missing
+	}
+
+	// Push the outputs of named derivations even if cached: the server
+	// uploads only what it lacks, such as a realisation of an output that
+	// another derivation built first.
+	for _, p := range namedOutPaths {
+		if !slices.Contains(resolvedPaths, p) {
+			resolvedPaths = append(resolvedPaths, p)
+		}
+	}
+
+	if len(resolvedPaths) == 0 {
+		return nil, nil
 	}
 
 	// Get path info for all paths and their closures
@@ -638,7 +660,7 @@ func (c *Client) PushPaths(ctx context.Context, paths []string) ([]string, error
 		return closurePaths, nil
 	}
 
-	realisations := c.queryRealisations(ctx, pathInfos)
+	realisations := c.queryRealisations(ctx, pathInfos, named)
 
 	// Prepare closures - one per top-level path
 	result, err := PrepareClosures(resolvedPaths, pathInfos, realisations)
