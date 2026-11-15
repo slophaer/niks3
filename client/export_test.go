@@ -110,3 +110,9 @@ func (c *Client) SetRegistrationTimeout(d time.Duration) {
 
 // GenerateNarinfoContent re-exports generateNarinfoContent for the external test package.
 var GenerateNarinfoContent = generateNarinfoContent //nolint:gochecknoglobals // test-only re-export
+
+// ParseRealisationsJSON re-exports parseRealisationsJSON for the external test package.
+var ParseRealisationsJSON = parseRealisationsJSON //nolint:gochecknoglobals // test-only re-export
+
+// RealisationInstallable re-exports realisationInstallable for the external test package.
+var RealisationInstallable = realisationInstallable //nolint:gochecknoglobals // test-only re-export
